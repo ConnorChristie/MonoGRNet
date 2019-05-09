@@ -1,0 +1,8 @@
+.vscode/
+.DS_Store
+
+outputs/*
+data/KittiBox/training
+data/model_*
+
+*.so

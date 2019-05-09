@@ -222,7 +222,7 @@ def _build_inner_layer(hyp, encoded_features, train):
 
     model_2D_path = os.path.join(hyp['dirs']['data_dir'], 'model_2D.pkl')
     with open(model_2D_path, 'rb') as file:
-        data_dict = pickle.load(file)#, encoding='latin1')    
+        data_dict = pickle.load(file, encoding='latin1')
         file.close()
 
     with tf.variable_scope('Overfeat'):
@@ -232,7 +232,7 @@ def _build_inner_layer(hyp, encoded_features, train):
 
     if train:
         # Adding dropout during training
-        output = tf.nn.dropout(output, 0.5)
+        output = tf.nn.dropout(output, rate=0.5)
     return output, data_dict
 
 
@@ -364,7 +364,7 @@ def _build_rezoom_layer(hyp, rezoom_input, data_dict, logits, train):
             hyp, pred_boxes, early_feat, early_feat_channels,
             w_offsets, h_offsets)
         if train:
-            rezoom_features = tf.nn.dropout(rezoom_features, 0.5)
+            rezoom_features = tf.nn.dropout(rezoom_features, rate=0.5)
 
         delta_features = tf.concat(
             axis=1,
@@ -428,10 +428,10 @@ def _bbox_from_corners(hyp, global_corners, calib, xy_scale):
     x_scale, y_scale = tf.split(xy_scale_r, [1, 1], axis=1)
     x = tf.clip_by_value(xz * x_scale / (z + 1e-5), 0, hyp['image_width'] - 1) 
     y = tf.clip_by_value(yz * y_scale / (z + 1e-5), 0, hyp['image_height'] - 1)
-    left = tf.reduce_min(x, axis=1, keep_dims=True)
-    right = tf.reduce_max(x, axis=1, keep_dims=True)
-    top = tf.reduce_min(y, axis=1, keep_dims=True)
-    bottom = tf.reduce_max(y, axis=1, keep_dims=True)
+    left = tf.reduce_min(x, axis=1, keepdims=True)
+    right = tf.reduce_max(x, axis=1, keepdims=True)
+    top = tf.reduce_min(y, axis=1, keepdims=True)
+    bottom = tf.reduce_max(y, axis=1, keepdims=True)
     coarse_stride = hyp['region_size']
     batch_ids = []
     x_offsets = []
@@ -647,18 +647,18 @@ def _compute_rezoom_loss(hypes, rezoom_loss_input, slow=False):
         error = (perm_truth[:, :, 0:2] - pred_boxes[:, :, 0:2]) \
             / tf.maximum(perm_truth[:, :, 2:4], 1.)
         square_error = tf.reduce_sum(tf.square(error), 2)
-        inside = tf.reshape(tf.to_int64(
+        inside = tf.reshape(tf.cast(
             tf.logical_and(tf.less(square_error, 0.2**2),
-                           tf.greater(classes, 0))), [-1])
+                           tf.greater(classes, 0)), tf.int64), [-1])
     elif hypes['rezoom_change_loss'] == 'iou':
         pred_boxes_flat = tf.reshape(pred_boxes, [-1, 4])
         perm_truth_flat = tf.reshape(perm_truth, [-1, 4])
         iou = train_utils.iou(train_utils.to_x1y1x2y2(pred_boxes_flat),
                               train_utils.to_x1y1x2y2(perm_truth_flat))
-        inside = tf.reshape(tf.to_int64(tf.greater(iou, 0.5)), [-1])
+        inside = tf.reshape(tf.cast(tf.greater(iou, 0.5), tf.int64), [-1])
     else:
         assert not hypes['rezoom_change_loss']
-        inside = tf.reshape(tf.to_int64((tf.greater(classes, 0))), [-1])
+        inside = tf.reshape(tf.cast((tf.greater(classes, 0)), tf.int64), [-1])
 
     cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
         logits=pred_confs_deltas, labels=inside)
